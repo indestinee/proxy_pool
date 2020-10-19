@@ -1,0 +1,46 @@
+{% extends 'template.html' %}
+
+{% block title %}
+    Submit Proxies
+{% endblock %}
+
+{% block body %}
+
+    <div>
+        <h2>Submit Proxies</h2>
+        <br/>
+        <textarea type="text" id="proxies" rows="20" cols="60" required></textarea>
+        <br/>
+        <button id="proxies_button">Submit</button>
+    </div>
+    <div id="result"></div>
+
+
+    <script>
+        $(document).ready(function () {
+            $("#proxies_button").click(function () {
+                $.ajax({
+                    contentType: 'application/json',
+                    type: 'POST',
+                    url: "/add_proxy",
+                    dataType: "json",
+                    data: JSON.stringify(GetJsonData()),
+                    success: function (response) {
+                        $("#result").html(response.success);
+                    },
+                    error: function (message) {
+                        $("#result").html(message);
+                    }
+                });
+            });
+
+            function GetJsonData() {
+                var json = {
+                    "proxies": $("#proxies").val(),
+                    "caller": $("#submit_proxy").val()
+                };
+                return json;
+            }
+        })
+    </script>
+{% endblock %}
