@@ -17,6 +17,7 @@ def get_args():
     parser.add_argument('--port', default='23301', type=str)
     parser.add_argument('--db', default='sqlite3', type=str, choices=modules.DB_CLIENTS)
     parser.add_argument('--level', default='debug', type=str, choices=modules.LOG_LEVELS)
+    parser.add_argument('--debug', action='store_true')
     return parser.parse_args()
 
 
@@ -100,4 +101,4 @@ def update_proxy(page=5):
 
 
 modules.run()
-app.run(host=args.host, port=args.port)
+app.run(host=args.host, port=args.port, debug=args.debug)
