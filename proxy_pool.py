@@ -1,5 +1,6 @@
 import itertools
 import requests
+import sys
 import threading
 import time
 
@@ -7,14 +8,16 @@ from concurrent.futures import ThreadPoolExecutor
 
 import config
 import sqls
+from ip_fetcher import schedule_fetch_proxy
 
 
 class ProxyPool:
-    def __init__(self, db_client, sess, logger):
+    def __init__(self, db_client, sess, logger, proxy_pool_client):
         self.sess = sess
         self.db_client = db_client
         self.logger = logger
         self.db_client.execute(sqls.CREATE_TABLE_SQL)
+        self.proxy_pool_client = proxy_pool_client
 
     def get_proxies(self, num):
         return self.db_client.execute(sqls.RANDOM_PICK_SQL, [num])
@@ -33,7 +36,7 @@ class ProxyPool:
             self.db_client.execute(sql, list(itertools.chain(*params)))
 
     def freeze_proxy(self, indices):
-        if isinstance(indices, str):
+        if isinstance(indices, int):
             indices = [indices]
         elif isinstance(indices, list):
             pass
@@ -42,8 +45,17 @@ class ProxyPool:
                 'type {} not implement in ProxyPool/freeze_proxy'.format(type(indices)))
         if indices:
             self.db_client.execute(
-                sqls.UPDATE_ACTIVE_SQL,
-                [sqls.Active.unknown, time.time(), indices])
+                sqls.UPDATE_ACTIVE_SQL.format(', '.join(['?'] * len(indices))),
+                [sqls.Active.unknown, time.time(), *indices])
+
+    def proxy_status(self):
+        return self.db_client.execute(sqls.QUERY_PROXY_STATUS_SQL)
+
+    def reset_proxy(self, active):
+        return self.db_client.execute(sqls.RESET_PROXY_SQL, [active])
+
+    def fetch_proxy(self, page):
+        return schedule_fetch_proxy(page, self.proxy_pool_client, self.logger)
 
     def update_proxy(self, indices, active):
         indices = ', '.join(map(str, indices))
@@ -59,7 +71,7 @@ class ProxyPool:
         except requests.exceptions.ConnectionError:
             return False, index
         except Exception as e:
-            self.logger.error(e)
+            self.logger.print_exception()
             return False, index
 
     def search_survivors(self, proxies):
@@ -86,7 +98,7 @@ class ProxyPool:
             try:
                 self.maintenance_execution(active)
             except Exception as e:
-                self.logger.error(e)
+                self.logger.print_exception()
             finally:
                 time.sleep(sleep_time)
 

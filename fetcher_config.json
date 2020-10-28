@@ -1,0 +1,18 @@
+{
+  "kuaidaili": {
+    "xpath": "//table//tr",
+    "url": "https://www.kuaidaili.com/free/inha/{page_id}/"
+  },
+  "xiladaili": {
+    "xpath": "//table//tr",
+    "url": "http://www.xiladaili.com/gaoni/{page_id}/"
+  },
+  "jiangxianli": {
+    "xpath": "//table//tr",
+    "url": "https://ip.jiangxianli.com/?page={page_id}"
+  },
+  "ihuan": {
+    "xpath": "//table//tr",
+    "url": "https://ip.ihuan.me/"
+  }
+}

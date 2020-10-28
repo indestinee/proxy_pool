@@ -1,26 +1,26 @@
-import argparse
+import json
 import re
+import requests
 import time
 
 from lxml import etree
-
-from client import Client
-from fetcher.config import CONFIGS
 
 RE_TAGS = re.compile(r'<[^>]+>')
 RE_IGNORE = re.compile(r'[ \t\n\r]')
 PATTERN = re.compile(r'(\d+\.\d+\.\d+\.\d+) *:* *(\d+)')
 
 
-def get_args():
-    parser = argparse.ArgumentParser(description='proxies_fetcher.')
-    parser.add_argument('-p', '--page', default=2, type=int)
-    parser.add_argument(
-        '-s', '--site', default='kuaidaili', type=str, choices=CONFIGS.keys())
-    return parser.parse_args()
+def get_default_session():
+    sess = requests.Session()
+    sess.headers = {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/85.0.4183.121 Safari/537.36',
+        'Accept-Language': 'zh-CN,zh;q=0.9,en;q=0.8'
+    }
+    return sess
 
 
-def fetch(url, sess):
+def fetch(url, sess, logger):
+    logger.info(url)
     response = sess.get(url)
     return response.text
 
@@ -40,21 +40,17 @@ def parse(html, xpath):
     return res
 
 
-def main():
-    args = get_args()
-    config = CONFIGS[args.site]
-    client = Client()
-    sess = config['sess']
-    xpath = config['xpath']
-    url = config['url']
-    for i in range(1, args.page + 1):
-        html = fetch(url.format(page_id=i), sess)
-        proxies = parse(html, xpath)
-        print('len:', len(proxies))
-        response = client.add_proxy(proxies)
-        print(response)
-        time.sleep(1)
-
-
-if __name__ == '__main__':
-    main()
+def schedule_fetch_proxy(num, client, logger):
+    with open("fetcher_config.json", "r") as f:
+        configs = json.load(f)
+    for config in configs.values():
+        sess = get_default_session()
+        xpath = config['xpath']
+        url = config['url']
+        page = num if '{page_id}' in url else 1
+        for i in range(1, page + 1):
+            html = fetch(url.format(page_id=i), sess, logger)
+            proxies = parse(html, xpath)
+            response = client.add_proxy(proxies)
+            logger.info(response)
+            time.sleep(1)

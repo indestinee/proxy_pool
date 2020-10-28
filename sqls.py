@@ -36,3 +36,11 @@ UPDATE proxy SET active = ?, update_time = ? WHERE id IN ({})
 RANDOM_PICK_SQL = """
 SELECT id, proxy FROM proxy WHERE active = 0 ORDER BY RANDOM() LIMIT ?;
 """
+
+QUERY_PROXY_STATUS_SQL = """
+SELECT count(id), active FROM proxy GROUP BY active
+"""
+
+RESET_PROXY_SQL = """
+DELETE FROM proxy WHERE active = ?
+"""
