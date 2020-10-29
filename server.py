@@ -2,7 +2,6 @@ import argparse
 
 from flask import Flask
 from flask import jsonify
-from flask import redirect
 from flask import render_template
 from flask import request
 
@@ -14,7 +13,7 @@ assert __name__ == '__main__'
 def get_args():
     parser = argparse.ArgumentParser(description='Proxy Pool')
     parser.add_argument('--host', default='127.0.0.1', type=str)
-    parser.add_argument('--port', default='23301', type=str)
+    parser.add_argument('--port', default=23301, type=int)
     parser.add_argument('--db', default='sqlite3', type=str, choices=modules.DB_CLIENTS)
     parser.add_argument('--level', default='debug', type=str, choices=modules.LOG_LEVELS)
     parser.add_argument('--debug', action='store_true')
