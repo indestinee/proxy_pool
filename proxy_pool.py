@@ -1,6 +1,5 @@
 import itertools
 import requests
-import sys
 import threading
 import time
 
@@ -16,11 +15,14 @@ class ProxyPool:
         self.sess = sess
         self.db_client = db_client
         self.logger = logger
-        self.db_client.execute(sqls.CREATE_TABLE_SQL)
+        [self.db_client.execute(CREATE_TABLE_SQL) for CREATE_TABLE_SQL in sqls.CREATE_TABLE_SQLS]
         self.proxy_pool_client = proxy_pool_client
 
-    def get_proxies(self, num):
-        return self.db_client.execute(sqls.RANDOM_PICK_SQL, [num])
+    def get_proxies(self, num, caller, ignore_freeze):
+        return [
+            item[0] for item in
+            self.db_client.execute(sqls.RANDOM_PICK_SQL, [caller, time.time() + (1e18 if ignore_freeze else 0), num])
+        ]
 
     def add_proxies(self, proxies):
         if isinstance(proxies, str):
@@ -35,24 +37,27 @@ class ProxyPool:
             params = [[proxy, sqls.Active.unknown, 0] for proxy in proxies]
             self.db_client.execute(sql, list(itertools.chain(*params)))
 
-    def freeze_proxy(self, indices):
-        if isinstance(indices, int):
-            indices = [indices]
-        elif isinstance(indices, list):
+    def freeze_proxy(self, proxies, caller, second):
+        if isinstance(proxies, str):
+            proxies = [proxies]
+        elif isinstance(proxies, list):
             pass
         else:
             raise NotImplementedError(
-                'type {} not implement in ProxyPool/freeze_proxy'.format(type(indices)))
-        if indices:
+                'type {} not implement in ProxyPool/add_proxies'.format(type(proxies)))
+        if proxies:
             self.db_client.execute(
-                sqls.UPDATE_ACTIVE_SQL.format(', '.join(['?'] * len(indices))),
-                [sqls.Active.unknown, time.time(), *indices])
+                sqls.INSERT_STATUS_SQL.format(', '.join(['?'] * len(proxies))),
+                [time.time() + second, caller, *proxies])
 
     def proxy_status(self):
         return self.db_client.execute(sqls.QUERY_PROXY_STATUS_SQL)
 
     def reset_proxy(self, active):
         return self.db_client.execute(sqls.RESET_PROXY_SQL, [active])
+
+    def add_caller(self, caller):
+        return self.db_client.execute(sqls.INSERT_CALLER_SQL, [caller])
 
     def fetch_proxy(self, page):
         return schedule_fetch_proxy(page, self.proxy_pool_client, self.logger)

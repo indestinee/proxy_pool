@@ -2,10 +2,10 @@ import argparse
 
 from flask import Flask
 from flask import jsonify
-from flask import redirect
 from flask import render_template
 from flask import request
 
+import checker
 import modules
 
 assert __name__ == '__main__'
@@ -14,9 +14,10 @@ assert __name__ == '__main__'
 def get_args():
     parser = argparse.ArgumentParser(description='Proxy Pool')
     parser.add_argument('--host', default='127.0.0.1', type=str)
-    parser.add_argument('--port', default='23301', type=str)
+    parser.add_argument('--port', default=23301, type=int)
     parser.add_argument('--db', default='sqlite3', type=str, choices=modules.DB_CLIENTS)
     parser.add_argument('--level', default='debug', type=str, choices=modules.LOG_LEVELS)
+    parser.add_argument('--debug', action='store_true')
     return parser.parse_args()
 
 
@@ -33,10 +34,16 @@ def index():
 
 @app.route('/get_proxy', methods=['POST'])
 def get_proxy():
-    data = request.get_json()
-    num = data['num']
     try:
-        proxies = modules.proxy_pool.get_proxies(num)
+        data = request.get_json()
+        num, caller, second, ignore_freeze = [
+            int(data['num']), data['caller'], int(data['freeze_time']), bool(data['ignore_freeze'])]
+        checker.check_caller(caller)
+        checker.check_pos_int(num)
+        modules.proxy_pool.add_caller(caller)
+        proxies = modules.proxy_pool.get_proxies(num, caller, ignore_freeze)
+        if caller and second > 0:
+            modules.proxy_pool.freeze_proxy(proxies, caller, second)
         return jsonify({'success': True, 'error_msg': '', 'proxies': proxies})
     except Exception as e:
         modules.logger.print_exception()
@@ -45,9 +52,9 @@ def get_proxy():
 
 @app.route('/add_proxy', methods=['POST'])
 def add_proxy():
-    data = request.get_json()
-    proxies = data['proxies']
     try:
+        data = request.get_json()
+        proxies = data['proxies']
         modules.proxy_pool.add_proxies(proxies)
         return jsonify({'success': True, 'error_msg': ''})
     except Exception as e:
@@ -57,10 +64,12 @@ def add_proxy():
 
 @app.route('/freeze_proxy', methods=['POST'])
 def freeze_proxy():
-    data = request.get_json()
-    indices = data['indices']
     try:
-        modules.proxy_pool.freeze_proxy(indices)
+        data = request.get_json()
+        proxies, caller, second = data['proxies'], data['caller'], data['second']
+        checker.check_caller(caller)
+        modules.proxy_pool.add_caller(caller)
+        modules.proxy_pool.freeze_proxy(proxies, caller, second)
         return jsonify({'success': True, 'error_msg': ''})
     except Exception as e:
         modules.logger.print_exception()
@@ -100,4 +109,4 @@ def update_proxy(page=5):
 
 
 modules.run()
-app.run(host=args.host, port=args.port)
+app.run(host=args.host, port=args.port, debug=args.debug)
