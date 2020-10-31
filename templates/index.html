@@ -60,6 +60,14 @@
             setInterval(get_status, 5000);
         })
 
+        function build_response_html(name, response) {
+            let html = `<p>${name}: ${response.success ? "succeed!" : "failed!"}</p>`;
+            if (!response.success) {
+                html += `<p>error: ${response.error_msg}</p>`;
+            }
+            return html;
+        }
+
         $("#submit_proxy").click(function () {
             $("#result").html("submit_proxy: waiting");
             $.ajax({
@@ -72,10 +80,7 @@
                     "caller": $("#submit_proxy").val()
                 }),
                 success: function (response) {
-                    $("#result").html("submit_proxy: " + response.success + response.error_msg);
-                },
-                error: function (message) {
-                    $("#result").html(message);
+                    $("#result").html(build_response_html("submit_proxy", response));
                 }
             });
         });
@@ -88,7 +93,7 @@
                 url: "/reset_proxy",
                 dataType: "json",
                 success: function (response) {
-                    $("#result").html("reset_proxy: " + response.success + response.error_msg);
+                    $("#result").html(build_response_html("reset_proxy", response));
                 },
                 error: function (message) {
                     $("#result").html(message);
@@ -104,7 +109,7 @@
                 url: "/fetch_proxy",
                 dataType: "json",
                 success: function (response) {
-                    $("#result").html("fetch_proxy: " + response.success + response.error_msg);
+                    $("#result").html(build_response_html("fetch_proxy", response));
                 },
                 error: function (message) {
                     $("#result").html(message);
