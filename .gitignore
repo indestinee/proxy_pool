@@ -1,6 +1,7 @@
 *.db
 *.bak
 .*swp
+*.db-journal
 .DS_Store
 
 __pycache__/
