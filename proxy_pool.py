@@ -15,7 +15,7 @@ class ProxyPool:
         self.sess = sess
         self.db_client = db_client
         self.logger = logger
-        [self.db_client.execute(CREATE_TABLE_SQL) for CREATE_TABLE_SQL in sqls.CREATE_TABLE_SQLS]
+        self.db_client.execute(sqls.CREATE_TABLE_SQLS)
         self.proxy_pool_client = proxy_pool_client
 
     def get_proxies(self, num, caller, ignore_freeze):
@@ -54,7 +54,7 @@ class ProxyPool:
         return self.db_client.execute(sqls.QUERY_PROXY_STATUS_SQL)
 
     def reset_proxy(self, active):
-        return self.db_client.execute(sqls.RESET_PROXY_SQL, [active])
+        return self.db_client.execute(sqls.RESET_PROXY_SQLS, [active, active])
 
     def add_caller(self, caller):
         return self.db_client.execute(sqls.INSERT_CALLER_SQL, [caller])

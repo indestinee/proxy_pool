@@ -31,7 +31,7 @@ INSERT_PROXY_SQL = """INSERT OR IGNORE INTO proxy (proxy, active, update_time) V
 
 INSERT_CALLER_SQL = """INSERT OR IGNORE INTO caller (caller) VALUES (?)"""
 
-INSERT_STATUS_SQL = """INSERT OR REPLACE INTO status
+INSERT_STATUS_SQL = """INSERT OR IGNORE INTO status
 (caller_id, proxy_id, available_time)
 SELECT *, ? AS available_time FROM
 (SELECT caller.id AS caller_id FROM caller WHERE caller = ?)
@@ -70,6 +70,7 @@ QUERY_PROXY_STATUS_SQL = """
 SELECT count(id), active FROM proxy GROUP BY active
 """
 
-RESET_PROXY_SQL = """
-DELETE FROM proxy WHERE active = ?
-"""
+RESET_PROXY_SQLS = [
+    """DELETE FROM status WHERE proxy_id IN (SELECT id FROM proxy WHERE active = ?);""",
+    """DELETE FROM proxy WHERE active = ?;"""
+]
