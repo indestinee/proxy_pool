@@ -110,12 +110,12 @@ def reset_proxy(active=1):
         return jsonify({'success': False, 'error_msg': str(e)})
 
 
-@app.route('/fetch_proxy', methods=['GET'])
-@app.route('/fetch_proxy/<int:page>', methods=['GET'])
+@app.route('/update_proxy', methods=['GET'])
+@app.route('/update_proxy/<int:page>', methods=['GET'])
 def update_proxy(page=5):
     try:
-        modules.proxy_pool.fetch_proxy(page)
-        return jsonify({'success': True, 'error_msg': ''})
+        msg = modules.proxy_pool.fetch_proxy(page)
+        return jsonify({'success': False if msg else True, 'error_msg': msg})
     except Exception as e:
         modules.logger.print_exception()
         return jsonify({'success': False, 'error_msg': str(e)})
