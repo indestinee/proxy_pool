@@ -24,7 +24,7 @@ class Modules:
         sess = requests.Session()
         sess.mount('https://', HTTPAdapter(max_retries=Retry(total=3)))
         database_client = DB_CLIENTS[args.db](config.DB_NAME)
-        self.logger = ColorfulLog(LOG_LEVELS[args.level], log_name='proxy_pool')
+        self.logger = ColorfulLog(LOG_LEVELS[args.level], log_dir=config.LOG_PATH, log_name='proxy_pool')
         self.proxy_pool_client = Client(caller='proxy_pool', host=args.host, port=args.port)
         self.proxy_pool = ProxyPool(database_client, sess, self.logger, self.proxy_pool_client)
 

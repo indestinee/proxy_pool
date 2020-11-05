@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from flask import Flask
 from flask import jsonify
@@ -6,6 +7,7 @@ from flask import render_template
 from flask import request
 
 import checker
+import config
 import modules
 
 assert __name__ == '__main__'
@@ -30,6 +32,17 @@ app = Flask('proxy_pool', static_folder='static', static_url_path='/static')
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/logs')
+@app.route('/logs/<string:fn>')
+def get_logs(fn=''):
+    fn = os.path.join(config.LOG_PATH, os.path.basename(fn))
+    if os.path.isfile(fn) and fn.endswith('.log'):
+        with open(fn) as f:
+            return '\n'.join(map('<p>{}</p>'.format, f.readlines()))
+    logs = os.listdir(config.LOG_PATH)
+    return '\n'.join(['<p><a href="/logs/{log}">{log}</a></p>'.format(log=log) for log in logs])
 
 
 @app.route('/get_proxy', methods=['POST'])
