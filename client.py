@@ -26,4 +26,4 @@ class Client:
                              json={'proxies': proxies, 'second': second, 'caller': caller}).json()
 
     def update_proxy(self):
-        return requests.get('{}/fetch_proxy'.format(self.url))
+        return requests.get('{}/update_proxy'.format(self.url)).json()

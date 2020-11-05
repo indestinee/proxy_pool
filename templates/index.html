@@ -112,7 +112,7 @@
                 url: "/update_proxy",
                 dataType: "json",
                 success: function (response) {
-                    $("#result").html(build_response_html("create update_proxy task", response));
+                    $("#result").html(build_response_html("update_proxy", response));
                 },
                 error: function (message) {
                     $("#result").html(message);

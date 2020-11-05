@@ -66,7 +66,7 @@ class ProxyPool:
                 schedule_fetch_proxy(page, self.proxy_pool_client, self.logger)
             finally:
                 self.fetch_lock.release()
-                return False
+                return ''
         return 'fetching proxy is already in progress.'
 
     def update_proxy(self, indices, active):
