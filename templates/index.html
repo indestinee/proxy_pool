@@ -15,6 +15,7 @@
 
         .side {
             float: left;
+            text-align: left;
         }
 
         .curtain {
@@ -38,10 +39,12 @@
     </style>
     <div class="curtain">
         <div class="side">
+            <div style="font-size: 22px"><a href="/logs">logs</a></div>
             <div id="status"></div>
-            <br/>
-            <button id="fetch_proxy" class="button">Fetch</button>
-            <button id="reset_proxy" class="button">Reset</button>
+            <div>
+                <button id="update_proxy" class="button">Fetch</button>
+                <button id="reset_proxy" class="button">Reset</button>
+            </div>
             <div id="result"></div>
         </div>
         <br/>
@@ -62,7 +65,7 @@
 
         function build_response_html(name, response) {
             let html = `<p>${name}: ${response.success ? "succeed!" : "failed!"}</p>`;
-            if (!response.success) {
+            if (response.error_msg) {
                 html += `<p>error: ${response.error_msg}</p>`;
             }
             return html;
@@ -101,15 +104,15 @@
             });
         });
 
-        $("#fetch_proxy").click(function () {
-            $("#result").html("fetch_proxy: waiting");
+        $("#update_proxy").click(function () {
+            $("#result").html("update_proxy: waiting");
             $.ajax({
                 contentType: "application/json",
                 type: "get",
-                url: "/fetch_proxy",
+                url: "/update_proxy",
                 dataType: "json",
                 success: function (response) {
-                    $("#result").html(build_response_html("fetch_proxy", response));
+                    $("#result").html(build_response_html("create update_proxy task", response));
                 },
                 error: function (message) {
                     $("#result").html(message);

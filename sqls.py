@@ -67,7 +67,7 @@ ORDER BY RANDOM() LIMIT ?;
 """
 
 QUERY_PROXY_STATUS_SQL = """
-SELECT count(id), active FROM proxy GROUP BY active
+SELECT active, count(id) FROM proxy GROUP BY active
 """
 
 RESET_PROXY_SQLS = [

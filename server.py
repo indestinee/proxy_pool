@@ -1,4 +1,5 @@
 import argparse
+import os
 
 from flask import Flask
 from flask import jsonify
@@ -6,6 +7,7 @@ from flask import render_template
 from flask import request
 
 import checker
+import config
 import modules
 
 assert __name__ == '__main__'
@@ -30,6 +32,17 @@ app = Flask('proxy_pool', static_folder='static', static_url_path='/static')
 @app.route('/')
 def index():
     return render_template('index.html')
+
+
+@app.route('/logs')
+@app.route('/logs/<string:fn>')
+def get_logs(fn=''):
+    fn = os.path.join(config.LOG_PATH, os.path.basename(fn))
+    if os.path.isfile(fn) and fn.endswith('.log'):
+        with open(fn) as f:
+            return '\n'.join(map('<p>{}</p>'.format, f.readlines()))
+    logs = os.listdir(config.LOG_PATH)
+    return '\n'.join(['<p><a href="/logs/{log}">{log}</a></p>'.format(log=log) for log in logs])
 
 
 @app.route('/get_proxy', methods=['POST'])
@@ -97,12 +110,12 @@ def reset_proxy(active=1):
         return jsonify({'success': False, 'error_msg': str(e)})
 
 
-@app.route('/fetch_proxy', methods=['GET'])
-@app.route('/fetch_proxy/<int:page>', methods=['GET'])
+@app.route('/update_proxy', methods=['GET'])
+@app.route('/update_proxy/<int:page>', methods=['GET'])
 def update_proxy(page=5):
     try:
-        modules.proxy_pool.fetch_proxy(page)
-        return jsonify({'success': True, 'error_msg': ''})
+        msg = modules.proxy_pool.fetch_proxy(page)
+        return jsonify({'success': False if msg else True, 'error_msg': msg})
     except Exception as e:
         modules.logger.print_exception()
         return jsonify({'success': False, 'error_msg': str(e)})

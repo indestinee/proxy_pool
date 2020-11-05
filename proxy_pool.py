@@ -17,6 +17,7 @@ class ProxyPool:
         self.logger = logger
         self.db_client.execute(sqls.CREATE_TABLE_SQLS)
         self.proxy_pool_client = proxy_pool_client
+        self.fetch_lock = threading.Lock()
 
     def get_proxies(self, num, caller, ignore_freeze):
         return [
@@ -60,7 +61,13 @@ class ProxyPool:
         return self.db_client.execute(sqls.INSERT_CALLER_SQL, [caller])
 
     def fetch_proxy(self, page):
-        return schedule_fetch_proxy(page, self.proxy_pool_client, self.logger)
+        if self.fetch_lock.acquire(blocking=True, timeout=0):
+            try:
+                schedule_fetch_proxy(page, self.proxy_pool_client, self.logger)
+            finally:
+                self.fetch_lock.release()
+                return False
+        return 'fetching proxy is already in progress.'
 
     def update_proxy(self, indices, active):
         indices = ', '.join(map(str, indices))
