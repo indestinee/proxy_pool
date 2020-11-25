@@ -1,4 +1,3 @@
-import argparse
 import os
 
 from flask import Flask
@@ -12,19 +11,7 @@ import modules
 
 assert __name__ == '__main__'
 
-
-def get_args():
-    parser = argparse.ArgumentParser(description='Proxy Pool')
-    parser.add_argument('--host', default='127.0.0.1', type=str)
-    parser.add_argument('--port', default=23301, type=int)
-    parser.add_argument('--db', default='sqlite3', type=str, choices=modules.DB_CLIENTS)
-    parser.add_argument('--level', default='debug', type=str, choices=modules.LOG_LEVELS)
-    parser.add_argument('--debug', action='store_true')
-    return parser.parse_args()
-
-
-args = get_args()
-modules = modules.Modules(args)
+proxy_pool_modules = modules.Modules(modules.get_args())
 
 app = Flask('proxy_pool', static_folder='static', static_url_path='/static')
 
@@ -41,7 +28,7 @@ def get_logs(fn=''):
     if os.path.isfile(fn) and fn.endswith('.log'):
         with open(fn) as f:
             return '\n'.join(map('<p>{}</p>'.format, f.readlines()))
-    logs = os.listdir(config.LOG_PATH)
+    logs = sorted(os.listdir(config.LOG_PATH))
     return '\n'.join(['<p><a href="/logs/{log}">{log}</a></p>'.format(log=log) for log in logs])
 
 
@@ -49,17 +36,17 @@ def get_logs(fn=''):
 def get_proxy():
     try:
         data = request.get_json()
-        num, caller, second, ignore_freeze = [
-            int(data['num']), data['caller'], int(data['freeze_time']), bool(data['ignore_freeze'])]
-        checker.check_caller(caller)
-        checker.check_pos_int(num)
-        modules.proxy_pool.add_caller(caller)
-        proxies = modules.proxy_pool.get_proxies(num, caller, ignore_freeze)
-        if caller and second > 0:
-            modules.proxy_pool.freeze_proxy(proxies, caller, second)
+        num = checker.get_pos_int(data['num'])
+        caller = checker.get_non_empty_str(data['caller'])
+        second = checker.get_natural_int(data['freeze_time'])
+        ignore_freeze = bool(data['ignore_freeze'])
+        proxy_pool_modules.proxy_pool.add_caller(caller)
+        proxies = proxy_pool_modules.proxy_pool.get_proxies(num, caller, ignore_freeze)
+        if second:
+            proxy_pool_modules.proxy_pool.freeze_proxy(proxies, caller, second)
         return jsonify({'success': True, 'error_msg': '', 'proxies': proxies})
     except Exception as e:
-        modules.logger.print_exception()
+        proxy_pool_modules.logger.print_exception()
         return jsonify({'success': False, 'error_msg': str(e), 'proxies': []})
 
 
@@ -67,11 +54,11 @@ def get_proxy():
 def add_proxy():
     try:
         data = request.get_json()
-        proxies = data['proxies']
-        modules.proxy_pool.add_proxies(proxies)
+        proxies = checker.get_proxies(data['proxies'])
+        proxy_pool_modules.proxy_pool.add_proxies(proxies)
         return jsonify({'success': True, 'error_msg': ''})
     except Exception as e:
-        modules.logger.print_exception()
+        proxy_pool_modules.logger.print_exception()
         return jsonify({'success': False, 'error_msg': str(e)})
 
 
@@ -79,23 +66,24 @@ def add_proxy():
 def freeze_proxy():
     try:
         data = request.get_json()
-        proxies, caller, second = data['proxies'], data['caller'], data['second']
-        checker.check_caller(caller)
-        modules.proxy_pool.add_caller(caller)
-        modules.proxy_pool.freeze_proxy(proxies, caller, second)
+        proxies = checker.get_proxies(data['proxies'])
+        caller = checker.get_non_empty_str(data['caller'])
+        second = checker.get_natural_int(data['second'])
+        proxy_pool_modules.proxy_pool.add_caller(caller)
+        proxy_pool_modules.proxy_pool.freeze_proxy(proxies, caller, second)
         return jsonify({'success': True, 'error_msg': ''})
     except Exception as e:
-        modules.logger.print_exception()
+        proxy_pool_modules.logger.print_exception()
         return jsonify({'success': False, 'error_msg': str(e)})
 
 
 @app.route('/proxy_status', methods=['GET'])
 def proxy_status():
     try:
-        status = modules.proxy_pool.proxy_status()
+        status = proxy_pool_modules.proxy_pool.proxy_status()
         return jsonify({'success': True, 'error_msg': '', 'status': status})
     except Exception as e:
-        modules.logger.print_exception()
+        proxy_pool_modules.logger.print_exception()
         return jsonify({'success': False, 'error_msg': str(e), 'status': []})
 
 
@@ -103,10 +91,10 @@ def proxy_status():
 @app.route('/reset_proxy/<int:active>', methods=['GET'])
 def reset_proxy(active=1):
     try:
-        modules.proxy_pool.reset_proxy(active)
+        proxy_pool_modules.proxy_pool.reset_proxy(active)
         return jsonify({'success': True, 'error_msg': ''})
     except Exception as e:
-        modules.logger.print_exception()
+        proxy_pool_modules.logger.print_exception()
         return jsonify({'success': False, 'error_msg': str(e)})
 
 
@@ -114,12 +102,12 @@ def reset_proxy(active=1):
 @app.route('/update_proxy/<int:page>', methods=['GET'])
 def update_proxy(page=5):
     try:
-        msg = modules.proxy_pool.fetch_proxy(page)
+        msg = proxy_pool_modules.proxy_pool.fetch_proxy(page)
         return jsonify({'success': False if msg else True, 'error_msg': msg})
     except Exception as e:
-        modules.logger.print_exception()
+        proxy_pool_modules.logger.print_exception()
         return jsonify({'success': False, 'error_msg': str(e)})
 
 
-modules.run()
-app.run(host=args.host, port=args.port, debug=args.debug)
+proxy_pool_modules.run()
+app.run(host=proxy_pool_modules.args.host, port=proxy_pool_modules.args.port, debug=proxy_pool_modules.args.debug)

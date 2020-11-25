@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 import config
 import sqls
-from ip_fetcher import schedule_fetch_proxy
+import ip_fetcher
 
 
 class ProxyPool:
@@ -18,6 +18,7 @@ class ProxyPool:
         self.db_client.execute(sqls.CREATE_TABLE_SQLS)
         self.proxy_pool_client = proxy_pool_client
         self.fetch_lock = threading.Lock()
+        self.executor = ThreadPoolExecutor(max_workers=config.MAX_WORKERS)
 
     def get_proxies(self, num, caller, ignore_freeze):
         return [
@@ -26,26 +27,12 @@ class ProxyPool:
         ]
 
     def add_proxies(self, proxies):
-        if isinstance(proxies, str):
-            proxies = [proxy.strip() for proxy in proxies.split('\n') if proxy.strip()]
-        elif isinstance(proxies, list):
-            pass
-        else:
-            raise NotImplementedError(
-                'type {} not implement in ProxyPool/add_proxies'.format(type(proxies)))
         if proxies:
             sql = sqls.INSERT_PROXY_SQL.format(', '.join(['(?, ?, ?)'] * len(proxies)))
             params = [[proxy, sqls.Active.unknown, 0] for proxy in proxies]
             self.db_client.execute(sql, list(itertools.chain(*params)))
 
     def freeze_proxy(self, proxies, caller, second):
-        if isinstance(proxies, str):
-            proxies = [proxies]
-        elif isinstance(proxies, list):
-            pass
-        else:
-            raise NotImplementedError(
-                'type {} not implement in ProxyPool/add_proxies'.format(type(proxies)))
         if proxies:
             self.db_client.execute(
                 sqls.INSERT_STATUS_SQL.format(', '.join(['?'] * len(proxies))),
@@ -63,16 +50,15 @@ class ProxyPool:
     def fetch_proxy(self, page):
         if self.fetch_lock.acquire(blocking=True, timeout=0):
             try:
-                schedule_fetch_proxy(page, self.proxy_pool_client, self.logger)
+                ip_fetcher.run_fetch_proxy(page, self.proxy_pool_client, self.logger)
+                return ''
             finally:
                 self.fetch_lock.release()
-                return ''
         return 'fetching proxy is already in progress.'
 
     def update_proxy(self, indices, active):
         indices = ', '.join(map(str, indices))
-        self.db_client.execute(
-            sqls.UPDATE_ACTIVE_SQL.format(indices), [active, time.time()])
+        self.db_client.execute(sqls.UPDATE_ACTIVE_SQL.format(indices), [active, time.time()])
 
     def is_alive(self, index, proxy):
         try:
@@ -87,40 +73,40 @@ class ProxyPool:
             return False, index
 
     def search_survivors(self, proxies):
-        with ThreadPoolExecutor(max_workers=config.MAX_WORKERS) as executor:
-            futures = [
-                executor.submit(self.is_alive, index=proxy[0], proxy=proxy[1])
-                for proxy in proxies]
-            executor.shutdown(wait=True)
+        futures = [self.executor.submit(self.is_alive, index=proxy[0], proxy=proxy[1]) for proxy in proxies]
         return [future.result() for future in futures]
 
-    def maintenance_execution(self, active, update_time=time.time() - config.EXPIRED_TIME):
+    def maintenance_proxies(self, active, update_time=time.time() - config.EXPIRED_TIME):
         self.logger.info('start check type {} proxies'.format(active))
-        proxies = self.db_client.execute(sqls.SELECT_PROXY_SQL, [update_time, active])
-        results = self.search_survivors(proxies)
-        successful_results = [result[1] for result in results if result[0]]
-        failed_results = [result[1] for result in results if not result[0]]
+        proxies = self.db_client.execute(sqls.SELECT_PROXY_SQL, [update_time, active, config.BATCH_SIZE])
+        survivors = self.search_survivors(proxies)
+        successful_results = [survivor[1] for survivor in survivors if survivor[0]]
+        failed_results = [survivor[1] for survivor in survivors if not survivor[0]]
         self.update_proxy(successful_results, sqls.Active.active)
         self.update_proxy(failed_results, sqls.Active.inactive)
         self.logger.info(
             'type {}: {} => active, {} => inactive'.format(active, len(successful_results), len(failed_results)))
+        return len(proxies)
+
+    def schedule_fetch_proxy(self, page, sleep_time):
+        while True:
+            start_time = time.time()
+            try:
+                self.fetch_proxy(page)
+            except Exception as e:
+                self.logger.print_exception()
+            time.sleep(max(0.0, sleep_time - (time.time() - start_time)))
 
     def maintenance(self, active, sleep_time):
         while True:
             try:
-                self.maintenance_execution(active)
+                if self.maintenance_proxies(active) < config.BATCH_SIZE:
+                    time.sleep(sleep_time)
             except Exception as e:
                 self.logger.print_exception()
-            finally:
-                time.sleep(sleep_time)
 
     def start_maintenance(self):
-        params = [
-            [sqls.Active.active, config.ACTIVE_SLEEP_TIME],
-            [sqls.Active.inactive, config.INACTIVE_SLEEP_TIME],
-            [sqls.Active.unknown, config.UNKNOWN_SLEEP_TIME]]
-        threads = [
-            threading.Thread(target=self.maintenance, args=param)
-            for param in params]
-        for thread in threads:
-            thread.start()
+        self.executor.submit(self.maintenance, active=sqls.Active.active, sleep_time=config.ACTIVE_SLEEP_TIME)
+        self.executor.submit(self.maintenance, active=sqls.Active.inactive, sleep_time=config.INACTIVE_SLEEP_TIME)
+        self.executor.submit(self.maintenance, active=sqls.Active.unknown, sleep_time=config.UNKNOWN_SLEEP_TIME)
+        self.executor.submit(self.schedule_fetch_proxy, page=config.FETCH_PAGE_NUM, sleep_time=config.FETCH_SLEEP_TIME)
