@@ -47,7 +47,7 @@ AND proxy_id IN (SELECT proxy.id as proxy_id FROM proxy WHERE proxy in {})
 SELECT_PROXY_SQL = """
 SELECT id, proxy FROM proxy
 WHERE update_time < ? AND active = ?
-ORDER BY update_time ASC LIMIT 16
+ORDER BY update_time ASC LIMIT ?
 """
 
 UPDATE_ACTIVE_SQL = """
@@ -55,13 +55,11 @@ UPDATE proxy SET active = ?, update_time = ? WHERE id IN ({})
 """
 
 RANDOM_PICK_SQL = """
-SELECT * FROM (
-	SELECT proxy FROM proxy WHERE active = 0
-	AND id NOT IN (
-		SELECT proxy_id FROM status WHERE caller_id IN (
-			SELECT id AS caller_id FROM caller WHERE caller = ?
-		) AND available_time > ?
-	)
+SELECT proxy FROM proxy WHERE active = 0
+AND id NOT IN (
+    SELECT proxy_id FROM status WHERE caller_id IN (
+        SELECT id AS caller_id FROM caller WHERE caller = ?
+    ) AND available_time > ?
 )
 ORDER BY RANDOM() LIMIT ?;
 """

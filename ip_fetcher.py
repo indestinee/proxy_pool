@@ -40,8 +40,8 @@ def parse(html, xpath):
     return res
 
 
-def schedule_fetch_proxy(num, client, logger):
-    with open("fetcher_config.json", "r") as f:
+def run_fetch_proxy(num, client, logger):
+    with open('fetcher_config.json', 'r') as f:
         configs = json.load(f)
     for config in configs.values():
         sess = get_default_session()
