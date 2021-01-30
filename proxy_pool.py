@@ -98,10 +98,14 @@ class ProxyPool:
             time.sleep(max(0.0, sleep_time - (time.time() - start_time)))
 
     def maintenance(self, active, sleep_time):
+        cnt = 0
         while True:
+            cnt += 1
             try:
                 if self.maintenance_proxies(active) < config.BATCH_SIZE:
                     time.sleep(sleep_time)
+                if cnt % 5 == 0:
+                    self.reset_proxy(sqls.Active.inactive)
             except Exception as e:
                 self.logger.print_exception()
 
